@@ -80,6 +80,8 @@ function savePointNest() {
 
 Safe mode handles common mistakes when working with transactions and log a stack trace to help remediate the issue.
 
+This is useful when you initially use this application and mix it with other data accessing functionality.
+
 If not in safe mode, these will be thrown as errors.
 
 It is **highly recommended** that you fix these issues before deploying or merging code.
@@ -97,9 +99,13 @@ These include:
 
 Creates a new transaction context. This context can be used for multiple transactions as long as they don't overlap in execution.
 
+Accepts any drizzle driver that supports transactions (currently Postgres-like, MySQL-like, and SQLite-like).
+
 #### options
 
-- safeMode: Enables safemode as explained above
+Both options default to `false`
+
+- safeMode: Enables safe mode as explained above
 - silent: If enabled, will turn off warning logs from `safeMode`. I highly recommend not doing this permanently.
 
 ### TransactionContext

@@ -51,11 +51,22 @@ type ExtractTransactionConfig<
 
 export type TransactionContextOptions = {
   /**
-   * Safe mode will try to prevent common issues with transactions and scoped execution in general
+   * Safe mode will try to prevent common issues with transactions and scoped execution in general.
+   *
+   * By default this is set to `false`
+   *
+   * It handles the following situations (read the docs for more details on how each of these cases are handled)
+   *
+   * - Calling `withTransaction` within another `withTransaction` execution scope
+   * - Calling `withSavePoint` outside of a `withTransaction` execution scope
+   * - Calling `useTransaction` outside of a `withTransaction` execution scope
+   * - Calling `useSavePoint` outside of a `withSavePoint` execution scope
    */
   safeMode?: boolean;
   /**
    * Turns off warning logs in safe mode
+   *
+   * By default, this is `false`
    */
   silent?: boolean;
 };
@@ -119,12 +130,14 @@ export class NoRunningSavePointError extends DrizzleTransactionContextError {
   }
 }
 /**
- * Create a transaction context. Excepts any drizzle driver that supports transactions (currently Postgres-like, MySQL-like, and SQLite-like).
+ * Creates a new transaction context. This context can be used for multiple transactions as long as they don't overlap in execution.
  *
- * Currently only accepts `safeMode` in options. Safe mode handles two possible errors and logs them as warnings with stack traces:
+ * Accepts any drizzle driver that supports transactions (currently Postgres-like, MySQL-like, and SQLite-like).
  *
- * - Running `withTransaction` within a `withTransaction` scope: In safe mode it will execute the `exec` parameter, allowing it to run in the same scope.
- * - Running `useTransaction` outside of a `withTransaction` scope: In safe mode it will return the db object, which can handle all the same methods as a transaction.
+ * `options` currently has two fields (both of which default to `false`):
+ *
+ * - `safeMode`: Enables "safe mode"
+ * - `silent`: Turns off warning logs in "safe mode"
  */
 export function createTransactionContext<
   TSchema extends BSchema,
