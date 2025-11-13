@@ -1,0 +1,13 @@
+{
+  "outputs": [
+    {
+      "name": "markdown",
+      "path": "./docs"
+    }
+  ],
+  "plugin": ["typedoc-plugin-markdown"],
+  "out": "./docs",
+  "entryPoints": ["index.ts"],
+  "entryPointStrategy": "expand",
+  "mergeReadme": false
+}

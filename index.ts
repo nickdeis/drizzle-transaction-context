@@ -1,0 +1,353 @@
+import type { ExtractTablesWithRelations } from "drizzle-orm";
+import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
+import type { BaseSQLiteDatabase } from "drizzle-orm/sqlite-core";
+
+import { AsyncLocalStorage } from "node:async_hooks";
+import type {
+  MySqlQueryResultHKT,
+  PreparedQueryHKTBase,
+  MySqlDatabase,
+} from "drizzle-orm/mysql-core";
+
+type BSchema = Record<string, unknown>;
+
+type PGDB<TSchema extends BSchema> = PgDatabase<
+  PgQueryResultHKT,
+  TSchema,
+  ExtractTablesWithRelations<TSchema>
+>;
+type SQLiteDB<
+  TSchema extends BSchema,
+  TRunResult = unknown
+> = BaseSQLiteDatabase<
+  "async" | "sync",
+  TRunResult,
+  TSchema,
+  ExtractTablesWithRelations<TSchema>
+>;
+
+type MYSQLDB<TSchema extends BSchema> = MySqlDatabase<
+  MySqlQueryResultHKT,
+  PreparedQueryHKTBase,
+  TSchema,
+  ExtractTablesWithRelations<TSchema>
+>;
+
+type DB<TSchema extends BSchema, SQLiteRunResult = unknown> =
+  | PGDB<TSchema>
+  | MYSQLDB<TSchema>
+  | SQLiteDB<TSchema, SQLiteRunResult>;
+
+type HasTransaction = { transaction: (...args: any[]) => any };
+
+type ExtractTransaction<X extends HasTransaction> = Parameters<
+  Parameters<X["transaction"]>[0]
+>[0];
+
+type ExtractTransactionConfig<
+  X extends DB<TSchema>,
+  TSchema extends BSchema
+> = Parameters<X["transaction"]>[1];
+
+export type TransactionContextOptions = {
+  /**
+   * Safe mode will try to prevent common issues with transactions and scoped execution in general
+   */
+  safeMode?: boolean;
+  /**
+   * Turns off warning logs in safe mode
+   */
+  silent?: boolean;
+};
+
+const DEFAULT_OPTIONS: TransactionContextOptions = {
+  safeMode: false,
+  silent: false,
+};
+
+export class DrizzleTransactionContextError extends Error {
+  name = "DrizzleTransactionContextError";
+  constructor(
+    errorMessage: string,
+    warningMessage: string,
+    safeMode: boolean = false
+  ) {
+    super(errorMessage + (safeMode ? " " + warningMessage : ""));
+  }
+}
+
+export class AlreadyRunningTransactionError extends DrizzleTransactionContextError {
+  name = "AlreadyRunningTransactionError";
+  constructor(safeMode?: boolean) {
+    super(
+      `You are calling "withTransaction" within a "withTransaction" call stack.`,
+      `Executing this function within the call stack with the same transaction`,
+      safeMode
+    );
+  }
+}
+
+export class NoRunningTransactionError extends DrizzleTransactionContextError {
+  name = "NoRunningTransactionError";
+  constructor(
+    safeMode?: boolean,
+    errMsg = `You are calling "useTransaction" outside of a "withTransaction" call stack.`,
+    warningMsg = `Returning the Database object instead, which can handle the same methods.`
+  ) {
+    super(errMsg, warningMsg, safeMode);
+  }
+  static useTransactionError(safeMode?: boolean) {
+    return new NoRunningTransactionError(safeMode);
+  }
+  static withSavePointError(safeMode?: boolean) {
+    return new NoRunningTransactionError(
+      safeMode,
+      `You are calling "withSavePoint" outside of "withTransaction" call stack.`,
+      `Calling "withTransaction" and then calling "withSavePoint" to execute within that stack`
+    );
+  }
+}
+
+export class NoRunningSavePointError extends DrizzleTransactionContextError {
+  name = "NoRunningSavePointError";
+  constructor(safeMode?: boolean) {
+    super(
+      `You are calling 'useSavePoint' outside of the 'withSavePoint' call stack.`,
+      `Returning the Transaction object instead, which can handle the same methods.`,
+      safeMode
+    );
+  }
+}
+/**
+ * Create a transaction context. Excepts any drizzle driver that supports transactions (currently Postgres-like, MySQL-like, and SQLite-like).
+ *
+ * Currently only accepts `safeMode` in options. Safe mode handles two possible errors and logs them as warnings with stack traces:
+ *
+ * - Running `withTransaction` within a `withTransaction` scope: In safe mode it will execute the `exec` parameter, allowing it to run in the same scope.
+ * - Running `useTransaction` outside of a `withTransaction` scope: In safe mode it will return the db object, which can handle all the same methods as a transaction.
+ */
+export function createTransactionContext<
+  TSchema extends BSchema,
+  SQLiteRunResult
+>(
+  db: SQLiteDB<TSchema, SQLiteRunResult>,
+  options?: TransactionContextOptions
+): ToMethods<
+  TransactionContext<
+    TSchema,
+    SQLiteDB<TSchema, SQLiteRunResult>,
+    SQLiteRunResult
+  >
+>;
+export function createTransactionContext<TSchema extends BSchema>(
+  db: MYSQLDB<TSchema>,
+  options?: TransactionContextOptions
+): ToMethods<TransactionContext<TSchema, MYSQLDB<TSchema>>>;
+export function createTransactionContext<TSchema extends BSchema>(
+  db: PGDB<TSchema>,
+  options?: TransactionContextOptions
+): ToMethods<TransactionContext<TSchema, PGDB<TSchema>>>;
+export function createTransactionContext<
+  TSchema extends BSchema,
+  TDB extends DB<TSchema, SQLiteRunResult>,
+  SQLiteRunResult = unknown
+>(
+  db: TDB,
+  options: TransactionContextOptions = DEFAULT_OPTIONS
+): ToMethods<TransactionContext<TSchema, TDB, SQLiteRunResult>> {
+  const {
+    inTransactionContext,
+    useTransaction,
+    withTransaction,
+    contextDepth,
+    currentSavePointName,
+    useSavePoint,
+    withSavePoint,
+    inSavePointContext,
+  } = new TransactionContext<TSchema, TDB, SQLiteRunResult>(db, options);
+  return {
+    inTransactionContext,
+    useTransaction,
+    withTransaction,
+    contextDepth,
+    currentSavePointName,
+    useSavePoint,
+    withSavePoint,
+    inSavePointContext,
+  };
+}
+
+type ITransactionStorage<TDB extends DB<TSchema>, TSchema extends BSchema> = {
+  tx?: ExtractTransaction<TDB>;
+  savepoint?: ExtractTransaction<TDB>;
+  savepointName?: string;
+  depth: number;
+};
+
+export class TransactionContext<
+  TSchema extends BSchema,
+  TDB extends DB<TSchema, SQLiteRunResult>,
+  SQLiteRunResult = unknown
+> {
+  private readonly storage: AsyncLocalStorage<
+    ITransactionStorage<TDB, TSchema>
+  >;
+  private getStore = (): ITransactionStorage<TDB, TSchema> => {
+    return this.storage.getStore() || { depth: 0 };
+  };
+  constructor(
+    private readonly db: TDB,
+    private readonly options: TransactionContextOptions = DEFAULT_OPTIONS
+  ) {
+    this.storage = new AsyncLocalStorage({ defaultValue: { depth: 0 } });
+  }
+  /**
+   * Creates a new transaction scope, so `useTransaction` will return within it's execution scope
+   * If in safe mode, another call of `withTransaction` within `withTransaction` will simply execute
+   * within that scope.
+   * In normal mode, it will throw a `AlreadyRunningTransactionError`.
+   *
+   * `config` is the same as drizzles transaction config options
+   */
+  withTransaction = async <X>(
+    exec: () => Promise<X>,
+    config?: ExtractTransactionConfig<TDB, TSchema>
+  ): Promise<X> => {
+    const { tx: tnx } = this.getStore();
+    if (tnx) {
+      const err = new AlreadyRunningTransactionError(this.options.safeMode);
+      if (this.options.safeMode) {
+        this.logWarning(err);
+        return await exec();
+      } else {
+        throw err;
+      }
+    }
+    return this.db.transaction((tx) => {
+      return this.storage.run({ tx, depth: 1 }, async () => {
+        return await exec();
+      });
+    }, config as any);
+  };
+  /**
+   * Returns the currently scoped transaction.
+   *
+   * In safe mode, if there is no running transaction, this will return the database object.
+   *
+   * In normal mode, it will throw a `NoRunningTransactionError`
+   */
+  useTransaction = () => {
+    const { tx } = this.getStore();
+    if (!tx) {
+      const err = NoRunningTransactionError.useTransactionError(
+        this.options.safeMode
+      );
+      if (this.options.safeMode) {
+        this.logWarning(err);
+        return this.db;
+      } else {
+        throw err;
+      }
+    }
+    return tx;
+  };
+  /**
+   * @returns True if in a `withTransaction` scope, false if otherwise
+   */
+  inTransactionContext = () => {
+    const { tx } = this.getStore();
+    return !!tx;
+  };
+  /**
+   * Creates a new execution scope for a savepoint
+   *
+   * Calling this in another savepoint creates a nested savepoint
+   *
+   * You can give the savepoint a name, but this is only used externally via this API for things like logging.
+   */
+  withSavePoint = async <Y>(
+    exec: () => Promise<Y>,
+    savepointName?: string
+  ): Promise<Y> => {
+    const { savepoint: existingSavepoint, depth, tx } = this.getStore();
+    if (!tx) {
+      const err = NoRunningTransactionError.withSavePointError(
+        this.options.safeMode
+      );
+      if (!this.options.safeMode) throw err;
+      this.logWarning(err);
+      return this.withTransaction(async () => {
+        return this.withSavePoint(exec, savepointName);
+      });
+    }
+    const wrappingTx = existingSavepoint || tx;
+    return wrappingTx.transaction(async (savepoint) => {
+      return this.storage.run(
+        { savepoint, savepointName, depth: depth + 1, tx },
+        () => {
+          return exec();
+        }
+      );
+    });
+  };
+  /**
+   * Gives the current context depth, useful for logging and debugging.
+   *
+   * Transaction scoped execution will return 1 always and savepoints will nested continuously
+   * eg: If you are in a save point in save point, this will be 3
+   */
+  contextDepth = () => {
+    const { depth } = this.getStore();
+    return depth;
+  };
+  /**
+   * Returns the name of the save point if it was given in `withSavePoint`.
+   * Useful for debugging and logging
+   */
+  currentSavePointName = () => {
+    const { savepointName } = this.getStore();
+    return savepointName;
+  };
+  /**
+   *
+   * @returns true if in a safepoint context, false if otherwise
+   */
+  inSavePointContext = () => {
+    const { savepoint } = this.getStore();
+    return !!savepoint;
+  };
+  private logWarning = (err: DrizzleTransactionContextError) => {
+    if (!this.options.silent) {
+      console.warn(err);
+    }
+  };
+  /**
+   * Returns the currently in scope savepoint.
+   *
+   * In safe mode, if no savepoint is present, this function will call `useTransaction` to returning the currently in scope transaction.
+   *
+   * This means that it's possible that it will return the database object instead and log two warnings.
+   */
+  useSavePoint = () => {
+    const { savepoint } = this.getStore();
+    if (!savepoint) {
+      const err = new NoRunningSavePointError(this.options.safeMode);
+      if (this.options.safeMode) {
+        this.logWarning(err);
+        return this.useTransaction();
+      } else {
+        throw err;
+      }
+    }
+    return savepoint;
+  };
+}
+
+type PublicMethodNames<T> = {
+  [K in keyof T]: T[K] extends (...args: any[]) => any ? K : never;
+}[keyof T];
+
+// Extracts a type with only the public methods
+type Methods<T> = Pick<T, PublicMethodNames<T>>;
+
+type ToMethods<T> = Omit<Methods<T>, "toMethods">;

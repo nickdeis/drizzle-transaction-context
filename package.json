@@ -1,0 +1,32 @@
+{
+  "version": "0.0.1",
+  "name": "drizzle-transaction-context",
+  "module": "index.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.3.13",
+    "@types/bun": "latest",
+    "drizzle-kit": "^0.31.6",
+    "drizzle-seed": "^0.3.1",
+    "typedoc": "^0.28.14",
+    "typedoc-plugin-markdown": "^4.9.0",
+    "typescript": "^5",
+    "@faker-js/faker": "^10.1.0"
+  },
+  "peerDependencies": {
+    "drizzle-orm": "^0.44.7"
+  },
+  "scripts": {
+    "clean": "rm -rf ./dist && mkdir dist",
+    "compile": "tsc -p tsconfig.build.json && bun run compile.ts",
+    "docs": "typedoc"
+  }
+}
