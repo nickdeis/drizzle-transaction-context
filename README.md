@@ -4,7 +4,7 @@ Implicit and execution scoped transactions/savepoints for drizzle-orm.
 
 Useful for keep transactions from blocking across functions/files/services.
 
-[Based on this spec by @agcty](https://github.com/drizzle-team/drizzle-orm/discussions/2777)
+[Based on this spec by](https://github.com/drizzle-team/drizzle-orm/discussions/2777) @agcty
 
 ## Example Usage
 
