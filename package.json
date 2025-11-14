@@ -1,5 +1,5 @@
 {
-  "version": "0.0.2",
+  "version": "0.1.2",
   "name": "drizzle-transaction-context",
   "module": "index.ts",
   "type": "module",
@@ -36,7 +36,10 @@
     "database"
   ],
   "author": "Nick Deis <nickjdeis@gmail.com>",
-  "repository": "https://github.com/nickdeis/drizzle-transaction-context",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nickdeis/drizzle-transaction-context.git"
+  },
   "license": "MIT",
   "engines": {
     "node": ">=18"
