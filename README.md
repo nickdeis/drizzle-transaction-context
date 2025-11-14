@@ -1,12 +1,18 @@
 # drizzle-transaction-context
 
-Implicit and execution scoped transactions/savepoints for drizzle-orm.
+Implicit and execution scoped transactions/savepoints for [drizzle-orm](https://github.com/drizzle-team/drizzle-orm).
 
 Useful for keep transactions from blocking across functions/files/services.
+
+Uses `node:async_hooks`, so this works in bun/deno/node (recommend that you use node 24+ for improved performance)
 
 [Based on this spec by](https://github.com/drizzle-team/drizzle-orm/discussions/2777) @agcty
 
 ## Example Usage
+
+```sh
+npm i drizzle-transaction-context
+```
 
 ```ts
 import { createTransactionContext } from "drizzle-transaction-context";
