@@ -4,6 +4,8 @@ Implicit and execution scoped transactions/savepoints for drizzle-orm.
 
 Useful for keep transactions from blocking across functions/files/services.
 
+[Based on this spec by @agcty](https://github.com/drizzle-team/drizzle-orm/discussions/2777)
+
 ## Example Usage
 
 ```ts
@@ -42,7 +44,7 @@ async function execAgeFix(name: string, age: number) {
 
 ## Savepoints
 
-Savepoints are supported as well. `withSavePoint` must be called within the execution scope of `withTransaction`.
+Savepoints are supported as well. `withSavePoint` must be called within the execution scope of `withTransaction` (safe mode will handle this for you).
 
 Unlike transactions, savepoints can be nested, so you can call `withSavePoint` within `withSavePoint` with no warning or error.
 

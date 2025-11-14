@@ -11,6 +11,7 @@
     },
     "./package.json": "./package.json"
   },
+  "types": "./dist/index.d.ts",
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.13",
     "@types/bun": "latest",
@@ -28,5 +29,16 @@
     "clean": "rm -rf ./dist && mkdir dist",
     "compile": "tsc -p tsconfig.build.json && bun run compile.ts",
     "docs": "typedoc"
+  },
+  "keywords": [
+    "drizzle",
+    "orm",
+    "database"
+  ],
+  "author": "Nick Deis <nickjdeis@gmail.com>",
+  "repository": "https://github.com/nickdeis/drizzle-transaction-context",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
   }
 }
