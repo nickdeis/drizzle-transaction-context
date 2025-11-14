@@ -218,7 +218,7 @@ export class TransactionContext<
    * Creates a new transaction scope, so `useTransaction` will return within it's execution scope
    * If in safe mode, another call of `withTransaction` within `withTransaction` will simply execute
    * within that scope.
-   * In normal mode, it will throw a `AlreadyRunningTransactionError`.
+   * In normal mode, it will throw a {@link AlreadyRunningTransactionError}.
    *
    * `config` is the same as drizzles transaction config options
    */
@@ -247,7 +247,7 @@ export class TransactionContext<
    *
    * In safe mode, if there is no running transaction, this will return the database object.
    *
-   * In normal mode, it will throw a `NoRunningTransactionError`
+   * In normal mode, it will throw a {@link NoRunningTransactionError}
    */
   useTransaction = () => {
     const { tx } = this.getStore();
@@ -277,6 +277,10 @@ export class TransactionContext<
    * Calling this in another savepoint creates a nested savepoint
    *
    * You can give the savepoint a name, but this is only used externally via this API for things like logging.
+   *
+   * throws {@link NoRunningTransactionError} when initialized outside of a `withTransaction` scope and not in safemode
+   *
+   * If safemode is on, will initialize a new transaction scope
    */
   withSavePoint = async <Y>(
     exec: () => Promise<Y>,
@@ -340,6 +344,8 @@ export class TransactionContext<
    * In safe mode, if no savepoint is present, this function will call `useTransaction` to returning the currently in scope transaction.
    *
    * This means that it's possible that it will return the database object instead and log two warnings.
+   *
+   * throws {@link NoRunningSavePointError} If called outside of a savepoint context with safemode off
    */
   useSavePoint = () => {
     const { savepoint } = this.getStore();
