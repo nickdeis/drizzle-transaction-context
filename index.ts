@@ -142,32 +142,35 @@ export class NoRunningSavePointError extends DrizzleTransactionContextError {
  * See {@link TransactionContextOptions}
  */
 export function createTransactionContext<
+  TDB extends SQLiteDB<TSchema, SQLiteRunResult>,
   TSchema extends BSchema,
   SQLiteRunResult
 >(
-  db: SQLiteDB<TSchema, SQLiteRunResult>,
+  db: TDB,
   options?: TransactionContextOptions
-): TransactionContext<
-  TSchema,
-  SQLiteDB<TSchema, SQLiteRunResult>,
-  SQLiteRunResult
->;
-export function createTransactionContext<TSchema extends BSchema>(
-  db: MYSQLDB<TSchema>,
-  options?: TransactionContextOptions
-): TransactionContext<TSchema, MYSQLDB<TSchema>>;
-export function createTransactionContext<TSchema extends BSchema>(
-  db: PGDB<TSchema>,
-  options?: TransactionContextOptions
-): TransactionContext<TSchema, PGDB<TSchema>>;
+): Methods<TransactionContext<TSchema, TDB, SQLiteRunResult>>;
 export function createTransactionContext<
-  TSchema extends BSchema,
+  TDB extends MYSQLDB<TSchema>,
+  TSchema extends BSchema
+>(
+  db: TDB,
+  options?: TransactionContextOptions
+): Methods<TransactionContext<TSchema, TDB>>;
+export function createTransactionContext<
+  TDB extends PGDB<TSchema>,
+  TSchema extends BSchema
+>(
+  db: TDB,
+  options?: TransactionContextOptions
+): Methods<TransactionContext<TSchema, TDB>>;
+export function createTransactionContext<
   TDB extends DB<TSchema, SQLiteRunResult>,
+  TSchema extends BSchema,
   SQLiteRunResult = unknown
 >(
   db: TDB,
   options: TransactionContextOptions = DEFAULT_OPTIONS
-): TransactionContext<TSchema, TDB, SQLiteRunResult> {
+): Methods<TransactionContext<TSchema, TDB, SQLiteRunResult>> {
   const {
     inTransactionContext,
     useTransaction,
@@ -187,7 +190,7 @@ export function createTransactionContext<
     useSavePoint,
     withSavePoint,
     inSavePointContext,
-  } as TransactionContext<TSchema, TDB, SQLiteRunResult>;
+  };
 }
 
 type ITransactionStorage<TDB extends DB<TSchema>, TSchema extends BSchema> = {
@@ -364,3 +367,10 @@ export class TransactionContext<
     return savepoint;
   };
 }
+
+type PublicMethodNames<T> = {
+  [K in keyof T]: T[K] extends (...args: any[]) => any ? K : never;
+}[keyof T];
+
+// Extracts a type with only the public methods
+type Methods<T> = Pick<T, PublicMethodNames<T>>;
