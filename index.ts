@@ -64,7 +64,7 @@ export type TransactionContextOptions = {
    */
   safeMode?: boolean;
   /**
-   * Turns off warning logs in safe mode
+   * Turns off warning logs in safe mode (**not recommended**)
    *
    * By default, this is `false`
    */
@@ -130,14 +130,16 @@ export class NoRunningSavePointError extends DrizzleTransactionContextError {
   }
 }
 /**
- * Creates a new transaction context. This context can be used for multiple transactions as long as they don't overlap in execution.
+ * Creates a new transaction context. This context can be used for multiple transactions as long as they don't overlap in execution (safe mode will handle this by executing them together)
  *
  * Accepts any drizzle driver that supports transactions (currently Postgres-like, MySQL-like, and SQLite-like).
  *
  * `options` currently has two fields (both of which default to `false`):
  *
  * - `safeMode`: Enables "safe mode"
- * - `silent`: Turns off warning logs in "safe mode"
+ * - `silent`: Turns off warning logs in "safe mode" (**not recommended**)
+ *
+ * See {@link TransactionContextOptions}
  */
 export function createTransactionContext<
   TSchema extends BSchema,
@@ -215,12 +217,15 @@ export class TransactionContext<
     this.storage = new AsyncLocalStorage({ defaultValue: { depth: 0 } });
   }
   /**
-   * Creates a new transaction scope, so `useTransaction` will return within it's execution scope
-   * If in safe mode, another call of `withTransaction` within `withTransaction` will simply execute
-   * within that scope.
+   * Creates a new transaction scope, so {@link useTransaction} will return within it's execution scope
+   *
+   * If in safe mode, another call of {@link withTransaction} within {@link withTransaction} will simply execute
+   * within the original transaction scope.
+   *
    * In normal mode, it will throw a {@link AlreadyRunningTransactionError}.
    *
-   * `config` is the same as drizzles transaction config options
+   * `config` is the same as drizzles transaction config options for MySQL, Postgres, and SQLite
+   *
    */
   withTransaction = async <X>(
     exec: () => Promise<X>,
@@ -318,7 +323,7 @@ export class TransactionContext<
     return depth;
   };
   /**
-   * Returns the name of the save point if it was given in `withSavePoint`.
+   * Returns the name of the save point if it was given in {@link withSavePoint}.
    * Useful for debugging and logging
    */
   currentSavePointName = () => {
@@ -341,11 +346,11 @@ export class TransactionContext<
   /**
    * Returns the currently in scope savepoint.
    *
-   * In safe mode, if no savepoint is present, this function will call `useTransaction` to returning the currently in scope transaction.
+   * In safe mode, if no savepoint is present, this function will call {@link useTransaction} to returning the currently in scope transaction.
    *
    * This means that it's possible that it will return the database object instead and log two warnings.
    *
-   * throws {@link NoRunningSavePointError} If called outside of a savepoint context with safemode off
+   * throws {@link NoRunningSavePointError} If called outside of a savepoint context with safe mode off
    */
   useSavePoint = () => {
     const { savepoint } = this.getStore();

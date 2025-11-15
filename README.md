@@ -88,7 +88,9 @@ function savePointNest() {
 
 Safe mode handles common mistakes when working with transactions and log a stack trace to help remediate the issue.
 
-This is useful when you initially use this application and mix it with other data accessing functionality.
+By default, this option is set to `false`.
+
+This is useful when you initially use this library and mix it with other data accessing functionality.
 
 If not in safe mode, these will be thrown as errors.
 
