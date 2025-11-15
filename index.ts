@@ -147,21 +147,19 @@ export function createTransactionContext<
 >(
   db: SQLiteDB<TSchema, SQLiteRunResult>,
   options?: TransactionContextOptions
-): ToMethods<
-  TransactionContext<
-    TSchema,
-    SQLiteDB<TSchema, SQLiteRunResult>,
-    SQLiteRunResult
-  >
+): TransactionContext<
+  TSchema,
+  SQLiteDB<TSchema, SQLiteRunResult>,
+  SQLiteRunResult
 >;
 export function createTransactionContext<TSchema extends BSchema>(
   db: MYSQLDB<TSchema>,
   options?: TransactionContextOptions
-): ToMethods<TransactionContext<TSchema, MYSQLDB<TSchema>>>;
+): TransactionContext<TSchema, MYSQLDB<TSchema>>;
 export function createTransactionContext<TSchema extends BSchema>(
   db: PGDB<TSchema>,
   options?: TransactionContextOptions
-): ToMethods<TransactionContext<TSchema, PGDB<TSchema>>>;
+): TransactionContext<TSchema, PGDB<TSchema>>;
 export function createTransactionContext<
   TSchema extends BSchema,
   TDB extends DB<TSchema, SQLiteRunResult>,
@@ -169,7 +167,7 @@ export function createTransactionContext<
 >(
   db: TDB,
   options: TransactionContextOptions = DEFAULT_OPTIONS
-): ToMethods<TransactionContext<TSchema, TDB, SQLiteRunResult>> {
+): TransactionContext<TSchema, TDB, SQLiteRunResult> {
   const {
     inTransactionContext,
     useTransaction,
@@ -189,7 +187,7 @@ export function createTransactionContext<
     useSavePoint,
     withSavePoint,
     inSavePointContext,
-  };
+  } as TransactionContext<TSchema, TDB, SQLiteRunResult>;
 }
 
 type ITransactionStorage<TDB extends DB<TSchema>, TSchema extends BSchema> = {
@@ -366,12 +364,3 @@ export class TransactionContext<
     return savepoint;
   };
 }
-
-type PublicMethodNames<T> = {
-  [K in keyof T]: T[K] extends (...args: any[]) => any ? K : never;
-}[keyof T];
-
-// Extracts a type with only the public methods
-type Methods<T> = Pick<T, PublicMethodNames<T>>;
-
-type ToMethods<T> = Omit<Methods<T>, "toMethods">;

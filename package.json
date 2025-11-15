@@ -1,5 +1,5 @@
 {
-  "version": "0.1.4",
+  "version": "0.1.5",
   "name": "drizzle-transaction-context",
   "module": "index.ts",
   "type": "module",
@@ -28,7 +28,8 @@
   "scripts": {
     "clean": "rm -rf ./dist && mkdir dist",
     "compile": "tsc -p tsconfig.build.json && bun run compile.ts",
-    "docs": "typedoc"
+    "docs": "typedoc",
+    "stage": "cd staging && npm i && npm test && cd .."
   },
   "keywords": [
     "drizzle",

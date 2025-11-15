@@ -4,3 +4,4 @@ compile.ts
 tsconfig*
 bun.lock
 typedoc.json
+staging

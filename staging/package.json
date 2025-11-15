@@ -1,0 +1,16 @@
+{
+  "name": "staging",
+  "version": "1.0.0",
+  "description": "",
+  "license": "ISC",
+  "author": "",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "node staging.cjs && node staging.js && node staging.js"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.44.7",
+    "drizzle-transaction-context": "^0.1.5"
+  }
+}
