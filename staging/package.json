@@ -11,6 +11,6 @@
   },
   "dependencies": {
     "drizzle-orm": "^0.44.7",
-    "drizzle-transaction-context": "^0.1.6"
+    "drizzle-transaction-context": "^0.2.7"
   }
 }

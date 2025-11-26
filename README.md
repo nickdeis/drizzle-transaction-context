@@ -1,3 +1,6 @@
+[![Build Status](https://github.com/nickdeis/drizzle-transaction-context/actions/workflows/main.yml/badge.svg)](https://github.com/nickdeis/drizzle-transaction-context/actions/workflows/main.yml/badge.svg)
+![NPM Version](https://img.shields.io/npm/v/drizzle-transaction-context?style=flat&color=%2389CFF0)
+
 # drizzle-transaction-context
 
 Implicit and execution scoped transactions/savepoints for [drizzle-orm](https://github.com/drizzle-team/drizzle-orm).
