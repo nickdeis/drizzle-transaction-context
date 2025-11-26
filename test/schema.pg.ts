@@ -15,17 +15,17 @@ const order = pgTable("orders", {
   customer_id: uuid()
     .references(() => customer.customer_id)
     .defaultRandom(),
-  order_id: uuid().primaryKey(),
+  order_id: uuid().primaryKey().defaultRandom(),
   order_total: real().notNull(),
 });
 
 const items = pgTable("items", {
-  item_id: uuid().primaryKey(),
+  item_id: uuid().primaryKey().defaultRandom(),
   order_id: uuid()
     .references(() => order.order_id)
     .defaultRandom(),
   item_quantity: integer().notNull(),
-  item_name: text(),
+  item_name: text().notNull(),
 });
 
 const schema = { items, order, customer };

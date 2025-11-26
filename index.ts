@@ -40,7 +40,7 @@ type DB<TSchema extends BSchema, SQLiteRunResult = unknown> =
 
 type HasTransaction = { transaction: (...args: any[]) => any };
 
-type ExtractTransaction<X extends HasTransaction> = Parameters<
+export type ExtractTransaction<X extends HasTransaction> = Parameters<
   Parameters<X["transaction"]>[0]
 >[0];
 
@@ -148,21 +148,27 @@ export function createTransactionContext<
 >(
   db: TDB,
   options?: TransactionContextOptions
-): Methods<TransactionContext<TSchema, TDB, SQLiteRunResult>>;
+): Methods<TransactionContext<TSchema, TDB, SQLiteRunResult>> & {
+  BoundedTxContext: InTxContextConstructor<TSchema, TDB, SQLiteRunResult>;
+};
 export function createTransactionContext<
   TDB extends MYSQLDB<TSchema>,
   TSchema extends BSchema
 >(
   db: TDB,
   options?: TransactionContextOptions
-): Methods<TransactionContext<TSchema, TDB>>;
+): Methods<TransactionContext<TSchema, TDB>> & {
+  BoundedTxContext: InTxContextConstructor<TSchema, TDB>;
+};
 export function createTransactionContext<
   TDB extends PGDB<TSchema>,
   TSchema extends BSchema
 >(
   db: TDB,
   options?: TransactionContextOptions
-): Methods<TransactionContext<TSchema, TDB>>;
+): Methods<TransactionContext<TSchema, TDB>> & {
+  BoundedTxContext: InTxContextConstructor<TSchema, TDB>;
+};
 export function createTransactionContext<
   TDB extends DB<TSchema, SQLiteRunResult>,
   TSchema extends BSchema,
@@ -170,7 +176,9 @@ export function createTransactionContext<
 >(
   db: TDB,
   options: TransactionContextOptions = DEFAULT_OPTIONS
-): Methods<TransactionContext<TSchema, TDB, SQLiteRunResult>> {
+): Methods<TransactionContext<TSchema, TDB, SQLiteRunResult>> & {
+  BoundedTxContext: InTxContextConstructor<TSchema, TDB, SQLiteRunResult>;
+} {
   const {
     inTransactionContext,
     useTransaction,
@@ -180,7 +188,18 @@ export function createTransactionContext<
     useSavePoint,
     withSavePoint,
     inSavePointContext,
+    Transactional,
+    SavePoint,
+    TxContextMixin,
   } = new TransactionContext<TSchema, TDB, SQLiteRunResult>(db, options);
+  class BoundedTxContext implements InTxContext<TSchema, TDB, SQLiteRunResult> {
+    inTransactionContext = inTransactionContext;
+    useTransaction = useTransaction;
+    contextDepth = contextDepth;
+    useSavePoint = useSavePoint;
+    inSavePointContext = inSavePointContext;
+    currentSavePointName = currentSavePointName;
+  }
   return {
     inTransactionContext,
     useTransaction,
@@ -190,6 +209,10 @@ export function createTransactionContext<
     useSavePoint,
     withSavePoint,
     inSavePointContext,
+    Transactional,
+    SavePoint,
+    TxContextMixin,
+    BoundedTxContext,
   };
 }
 
@@ -199,6 +222,32 @@ type ITransactionStorage<TDB extends DB<TSchema>, TSchema extends BSchema> = {
   savepointName?: string;
   depth: number;
 };
+type MethodDecorator = (
+  target: any,
+  propertyKey: string | symbol,
+  descriptor: PropertyDescriptor
+) => PropertyDescriptor;
+
+type Constructor = new (...args: any[]) => {};
+
+type InTxContextConstructor<
+  TSchema extends BSchema,
+  TDB extends DB<TSchema, SQLiteRunResult>,
+  SQLiteRunResult = unknown
+> = new () => InTxContext<TSchema, TDB, SQLiteRunResult>;
+
+interface InTxContext<
+  TSchema extends BSchema,
+  TDB extends DB<TSchema, SQLiteRunResult>,
+  SQLiteRunResult = unknown
+> {
+  inTransactionContext: () => boolean;
+  useTransaction: () => TDB | ExtractTransaction<TDB>;
+  contextDepth: () => number;
+  useSavePoint: () => TDB | ExtractTransaction<TDB>;
+  inSavePointContext: () => boolean;
+  currentSavePointName: () => string | undefined;
+}
 
 export class TransactionContext<
   TSchema extends BSchema,
@@ -216,6 +265,111 @@ export class TransactionContext<
     private readonly options: TransactionContextOptions = DEFAULT_OPTIONS
   ) {
     this.storage = new AsyncLocalStorage({ defaultValue: { depth: 0 } });
+    this.Transactional = this.Transactional.bind(this);
+    this.SavePoint = this.SavePoint.bind(this);
+  }
+  TxContextMixin = (Base?: Constructor) => {
+    const {
+      inTransactionContext,
+      useTransaction,
+      contextDepth,
+      currentSavePointName,
+      useSavePoint,
+      inSavePointContext,
+    } = this;
+    class Noop {}
+    const base = Base ? Base : Noop;
+    return class BoundTxContext
+      extends base
+      implements InTxContext<TSchema, TDB, SQLiteRunResult>
+    {
+      inTransactionContext = inTransactionContext;
+      useTransaction = useTransaction;
+      contextDepth = contextDepth;
+      currentSavePointName = currentSavePointName;
+      useSavePoint = useSavePoint;
+      inSavePointContext = inSavePointContext;
+    };
+  };
+  Transactional(
+    target: any,
+    propertyKey: string | symbol,
+    descriptor: PropertyDescriptor
+  ): PropertyDescriptor;
+  Transactional(): MethodDecorator;
+  Transactional(
+    config: ExtractTransactionConfig<TDB, TSchema>
+  ): MethodDecorator;
+  Transactional(
+    configOrTarget?: any,
+    propertyKey?: string | symbol,
+    descriptor?: PropertyDescriptor
+  ) {
+    if (!propertyKey || !descriptor) {
+      return this.wrapMethodInTransaction(
+        configOrTarget as ExtractTransactionConfig<TDB, TSchema>
+      );
+    }
+    return this.wrapMethodInTransaction(undefined)(
+      configOrTarget,
+      propertyKey,
+      descriptor
+    );
+  }
+  private wrapMethodInTransaction = (
+    config?: ExtractTransactionConfig<TDB, TSchema>
+  ) => {
+    const { withTransaction } = this;
+    return function (
+      _1: any,
+      _2: string | symbol,
+      descriptor: PropertyDescriptor
+    ) {
+      const original = descriptor.value;
+      if (typeof original !== "function") return descriptor;
+      descriptor.value = function (...args: any[]) {
+        const callOriginal = () => Promise.resolve(original.apply(this, args));
+        return withTransaction(callOriginal, config as any);
+      };
+      return descriptor;
+    };
+  };
+  SavePoint(
+    target: any,
+    propertyKey: string | symbol,
+    descriptor: PropertyDescriptor
+  ): PropertyDescriptor;
+  SavePoint(): MethodDecorator;
+  SavePoint(savePointName: string): MethodDecorator;
+  SavePoint(
+    nameOrTarget?: any,
+    propertyKey?: string | symbol,
+    descriptor?: PropertyDescriptor
+  ) {
+    if (!propertyKey || !descriptor) {
+      return this.wrapMethodInSavePoint(nameOrTarget as string);
+    }
+    return this.wrapMethodInSavePoint(undefined)(
+      nameOrTarget,
+      propertyKey,
+      descriptor
+    );
+  }
+  private wrapMethodInSavePoint(name?: string) {
+    const { withSavePoint } = this;
+    return function (
+      _1: any,
+      _2: string | symbol,
+      descriptor: PropertyDescriptor
+    ) {
+      const original = descriptor.value;
+      if (typeof original !== "function") return descriptor;
+      descriptor.value = function (...args: any[]) {
+        const callOriginal = () => Promise.resolve(original.apply(this, args));
+        return withSavePoint(callOriginal, name);
+      };
+      return descriptor;
+    };
   }
   /**
    * Creates a new transaction scope, so {@link useTransaction} will return within it's execution scope
@@ -277,6 +431,7 @@ export class TransactionContext<
     const { tx } = this.getStore();
     return !!tx;
   };
+
   /**
    * Creates a new execution scope for a savepoint
    *

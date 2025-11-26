@@ -1,4 +1,7 @@
 {
   "extends": "./tsconfig.build.json",
-  "include": ["index.ts", "test/*.ts"]
+  "include": ["index.ts", "test/*.ts"],
+  "compilerOptions": {
+    "experimentalDecorators": true
+  }
 }

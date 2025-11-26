@@ -84,6 +84,58 @@ function savePointNest() {
 //"sp1" 2
 ```
 
+## AOP/Service Oriented
+
+Big Spring fan? I gotchu:
+
+You can initialize a transaction scope with `@Transactional` and a savepoint scope with `@SavePoint`.
+
+```ts
+const { Transactional, SavePoint, useTransaction, useSavePoint } =
+  createTransactionContext(db);
+class A {
+  @Transactional
+  async insertCustomer() {
+    const tx = useTransaction();
+    const [result] = await tx
+      .insert(customer)
+      .values(g.customer())
+      .returning({ customer_id: customer.customer_id });
+    await this.insertOrder(result!.customer_id);
+    return result!.customer_id;
+  }
+  @SavePoint
+  private async insertOrder(customer_id: string) {
+    const sp = useSavePoint();
+    const [result] = await sp
+      .insert(order)
+      .values(g.order(customer_id))
+      .returning({ order_id: order.order_id });
+    await this.insertItem(result!.order_id);
+  }
+  @SavePoint("a")
+  private async insertItem(order_id: string) {
+    const sp = useSavePoint();
+    await sp.insert(items).values(g.item(order_id));
+  }
+}
+class B {
+  @Transactional({ accessMode: "read only" })
+  async getCustomer(customer_id: string) {
+    const tx = useTransaction();
+    const [result] = await tx
+      .select()
+      .from(customer)
+      .where(eq(customer.customer_id, customer_id));
+    return result;
+  }
+}
+const a = new A();
+const b = new B();
+const customer_id = await a.insertCustomer();
+await b.getCustomer(customer_id);
+```
+
 ## Safe Mode
 
 Safe mode handles common mistakes when working with transactions and log a stack trace to help remediate the issue.
