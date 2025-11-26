@@ -5,3 +5,5 @@ tsconfig*
 bun.lock
 typedoc.json
 staging
+package-lock.json
+.github

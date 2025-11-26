@@ -2,8 +2,8 @@ import { initialize as initPg } from "./schema.pg";
 import { initialize as initSQLite } from "./schema.sqlite";
 import * as g from "./generators";
 import { expect, test, describe } from "bun:test";
-import { createTransactionContext } from "..";
-import type { ExtractTransaction, TransactionContext } from "..";
+import { createTransactionContext } from "../dist";
+import type { ExtractTransaction, TransactionContext } from "../dist";
 import { faker } from "@faker-js/faker";
 type TestDB = Awaited<ReturnType<typeof initPg>>;
 type XAsync = (...args: any[]) => Promise<void>;
@@ -72,45 +72,48 @@ function performanceInnerSuite({
   return { startClassic, startContext };
 }
 
-async function performanceTestSuite(initDB: InitDBFn, dbName: string) {
-  const TESTS: [string, () => Promise<void>][] = [
-    [
-      "Context",
-      async () => {
-        const init = await initDB();
-        const time = await performanceInnerSuite(init).startContext();
-        console.log(
-          `${dbName} Context Transactions median transaction time: ${time}ms`
-        );
-      },
-    ],
-    [
-      "Classic",
-      async () => {
-        const init = await initDB();
-        const time = await performanceInnerSuite(init).startClassic();
-        console.log(
-          `${dbName} Classic Transactions median transaction time: ${time}ms`
-        );
-      },
-    ],
-  ];
-  const rand = Math.round(Math.random());
-  if (rand === 1) {
-    TESTS.reverse();
-  }
-  for (const [name, fn] of TESTS) {
-    test(name, fn);
-  }
+function performanceTestSuite(initDB: InitDBFn, dbName: string) {
+  const classic = async () => {
+    const init = await initDB();
+    const time = await performanceInnerSuite(init).startClassic();
+    console.log(
+      `${dbName} Classic Transactions median transaction time: ${time}ms`
+    );
+  };
+  const context = async () => {
+    const init = await initDB();
+    const time = await performanceInnerSuite(init).startContext();
+    console.log(
+      `${dbName} Context Transactions median transaction time: ${time}ms`
+    );
+  };
+  return { classic, context };
 }
 
-describe("drizzle-transaction-context", () => {
-  describe("performance", () => {
-    describe("Postgres", async () => {
-      await performanceTestSuite(initPg, "Postgres");
-    });
-    describe("SQLite", async () => {
-      await performanceTestSuite(initSQLite as any, "SQLite");
+function dbTestSuite() {
+  const postgres = performanceTestSuite(initPg, "Postgres");
+  const sqlite = performanceTestSuite(initSQLite as any, "SQLite");
+  return { postgres, sqlite };
+}
+declare var self: Worker;
+
+type RunData = {
+  db: "postgres" | "sqlite";
+  tx: "classic" | "context";
+};
+
+if (Bun.isMainThread) {
+  ["postgres", "sqlite"].forEach((db) => {
+    ["classic", "context"].forEach((tx) => {
+      const worker = new Worker(__filename);
+      worker.postMessage({ db, tx });
     });
   });
-});
+} else {
+  const runners = dbTestSuite();
+  self.onmessage = async (event: MessageEvent<RunData>) => {
+    const { db, tx } = event.data;
+    await runners[db][tx]();
+    process.exit(0);
+  };
+}
