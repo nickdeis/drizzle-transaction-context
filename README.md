@@ -1,5 +1,5 @@
 [![Build Status](https://github.com/nickdeis/drizzle-transaction-context/actions/workflows/main.yml/badge.svg)](https://github.com/nickdeis/drizzle-transaction-context/actions/workflows/main.yml/badge.svg)
-![NPM Version](https://img.shields.io/npm/v/drizzle-transaction-context?style=flat&color=%2389CFF0&link=https%3A%2F%2Fwww.npmjs.com%2Fpackage%2Fdrizzle-transaction-context)
+[![NPM Version](https://img.shields.io/npm/v/drizzle-transaction-context?style=flat&color=%2389CFF0)](https://www.npmjs.com/package/drizzle-transaction-context)
 
 # drizzle-transaction-context
 
