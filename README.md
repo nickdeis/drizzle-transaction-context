@@ -5,6 +5,10 @@
 
 Implicit and execution scoped transactions/savepoints for [drizzle-orm](https://github.com/drizzle-team/drizzle-orm).
 
+- Supports everything drizzle supports, with accurate types
+- Includes a safe mode for migrating over existing codebases
+- Has method decorators for AOP/Service based design patterns
+
 Useful for keep transactions from blocking across functions/files/services.
 
 Uses `node:async_hooks`, so this works in bun/deno/node (recommend that you use node 24+ for improved performance)
