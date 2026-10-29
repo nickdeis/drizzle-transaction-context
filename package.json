@@ -1,5 +1,5 @@
 {
-  "version": "0.2.7",
+  "version": "0.2.8",
   "name": "drizzle-transaction-context",
   "module": "index.ts",
   "type": "module",
@@ -24,7 +24,7 @@
     "typescript": "^5"
   },
   "peerDependencies": {
-    "drizzle-orm": "^0.44.7"
+    "drizzle-orm": "^0.44.7 || ^0.45.4"
   },
   "scripts": {
     "clean": "rm -rf ./dist && mkdir dist",
